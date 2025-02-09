@@ -1,4 +1,4 @@
-# Copyright (C) 2017 Google Inc.
+# Copyright 2017 Google LLC
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -20,7 +20,7 @@
 
 cmake_minimum_required(VERSION 3.4.1)
 
-# Import the ARCore library.
+# Import the ARCore (Google Play Services for AR) library.
 add_library(arcore SHARED IMPORTED)
 set_target_properties(arcore PROPERTIES IMPORTED_LOCATION
                       ${ARCORE_LIBPATH}/${ANDROID_ABI}/libarcore_sdk_c.so
@@ -29,9 +29,8 @@ set_target_properties(arcore PROPERTIES IMPORTED_LOCATION
 
 # Import the glm header file from the NDK.
 add_library( glm INTERFACE )
-set_target_properties( glm PROPERTIES
-                       INTERFACE_INCLUDE_DIRECTORIES ${ANDROID_NDK}/sources/third_party/vulkan/src/libs/glm
-)
+set_target_properties( glm PROPERTIES INTERFACE_INCLUDE_DIRECTORIES ${GLM_INCLUDE})
+
 # This is the main app library.
 add_library(augmented_image_native SHARED
            src/main/cpp/augmented_image_application.cc

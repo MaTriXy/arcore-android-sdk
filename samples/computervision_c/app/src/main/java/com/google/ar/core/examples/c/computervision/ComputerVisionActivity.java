@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -22,7 +22,8 @@ import android.hardware.display.DisplayManager;
 import android.opengl.GLES20;
 import android.opengl.GLSurfaceView;
 import android.os.Bundle;
-import android.support.v7.app.AppCompatActivity;
+import android.util.Log;
+import android.view.GestureDetector;
 import android.view.MotionEvent;
 import android.view.Surface;
 import android.view.View;
@@ -33,6 +34,8 @@ import android.widget.RadioGroup;
 import android.widget.Switch;
 import android.widget.TextView;
 import android.widget.Toast;
+import androidx.appcompat.app.AppCompatActivity;
+import com.google.android.material.snackbar.Snackbar;
 import javax.microedition.khronos.egl.EGLConfig;
 import javax.microedition.khronos.opengles.GL10;
 
@@ -42,6 +45,7 @@ import javax.microedition.khronos.opengles.GL10;
  */
 public class ComputerVisionActivity extends AppCompatActivity
     implements GLSurfaceView.Renderer, DisplayManager.DisplayListener {
+  private static final String TAG = ComputerVisionActivity.class.getSimpleName();
 
   // Opaque native pointer to the native application instance.
   private long nativeApplication;
@@ -58,6 +62,8 @@ public class ComputerVisionActivity extends AppCompatActivity
   private TextView cameraIntrinsicsTextView;
 
   private Switch focusModeSwitch;
+  private GestureDetector gestureDetector;
+  private Snackbar snackbar;
 
   @Override
   protected void onCreate(Bundle savedInstanceState) {
@@ -68,17 +74,25 @@ public class ComputerVisionActivity extends AppCompatActivity
     focusModeSwitch.setOnCheckedChangeListener(this::onFocusModeChanged);
 
     surfaceView = findViewById(R.id.surfaceview);
-    surfaceView.setOnTouchListener(
-        (View view, MotionEvent motionEvent) -> {
-          if (motionEvent.getAction() == MotionEvent.ACTION_UP) {
-            splitterPosition = (splitterPosition < 0.5f) ? 1.0f : 0.0f;
+    gestureDetector =
+        new GestureDetector(
+            this,
+            new GestureDetector.SimpleOnGestureListener() {
+              @Override
+              public boolean onSingleTapUp(MotionEvent e) {
+                splitterPosition = (splitterPosition < 0.5f) ? 1.0f : 0.0f;
 
-            // Turn off the CPU resolution radio buttons if CPU image is not displayed.
-            showCameraConfigMenu(splitterPosition < 0.5f);
-          }
+                // Turn off the CPU resolution radio buttons if CPU image is not displayed.
+                showCameraConfigMenu(splitterPosition < 0.5f);
+                return true;
+              }
 
-          return true;
-        });
+              @Override
+              public boolean onDown(MotionEvent e) {
+                return true;
+              }
+            });
+    surfaceView.setOnTouchListener((unusedView, event) -> gestureDetector.onTouchEvent(event));
 
     // Set up renderer.
     surfaceView.setPreserveEGLContextOnPause(true);
@@ -86,6 +100,7 @@ public class ComputerVisionActivity extends AppCompatActivity
     surfaceView.setEGLConfigChooser(8, 8, 8, 8, 16, 0); // Alpha used for plane blending.
     surfaceView.setRenderer(this);
     surfaceView.setRenderMode(GLSurfaceView.RENDERMODE_CONTINUOUSLY);
+    surfaceView.setWillNotDraw(false);
 
     nativeApplication = JniInterface.createNativeApplication(getAssets());
   }
@@ -100,8 +115,14 @@ public class ComputerVisionActivity extends AppCompatActivity
       return;
     }
 
-    JniInterface.onResume(nativeApplication, getApplicationContext(), this);
-    surfaceView.onResume();
+    try {
+      JniInterface.onResume(nativeApplication, getApplicationContext(), this);
+      surfaceView.onResume();
+    } catch (Exception e) {
+      Log.e(TAG, "Exception resuming session", e);
+      displayInSnackbar(e.getMessage());
+      return;
+    }
 
     // Update the radio buttons with the resolution info.
     String lowResLabel = JniInterface.getCameraConfigLabel(nativeApplication, true);
@@ -256,6 +277,7 @@ public class ComputerVisionActivity extends AppCompatActivity
 
   @Override
   public void onRequestPermissionsResult(int requestCode, String[] permissions, int[] results) {
+    super.onRequestPermissionsResult(requestCode, permissions, results);
     if (!CameraPermissionHelper.hasCameraPermission(this)) {
       Toast.makeText(this, "Camera permission is needed to run this application", Toast.LENGTH_LONG)
           .show();
@@ -315,5 +337,13 @@ public class ComputerVisionActivity extends AppCompatActivity
   private void showCameraConfigMenu(boolean show) {
     RadioGroup radioGroup = (RadioGroup) findViewById(R.id.radio_camera_configs);
     radioGroup.setVisibility(show ? View.VISIBLE : View.INVISIBLE);
+  }
+
+  /** Display the message in the snackbar. */
+  private void displayInSnackbar(String message) {
+    snackbar =
+        Snackbar.make(findViewById(android.R.id.content), message, Snackbar.LENGTH_INDEFINITE);
+
+    snackbar.show();
   }
 }

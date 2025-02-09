@@ -1,3 +1,18 @@
+/*
+ * Copyright 2017 Google LLC
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
 apply plugin: 'com.android.application'
 
 /*
@@ -10,31 +25,34 @@ def arcore_libpath = "${buildDir}/arcore-native"
 configurations { natives }
 
 android {
-    compileSdkVersion 27
+    namespace "com.google.ar.core.examples.c.augmentedimage"
+    compileSdkVersion 35
     defaultConfig {
         applicationId "com.google.ar.core.examples.c.augmentedimage"
 
-        // 24 is the minimum since ARCore only works with 24 and higher.
+        // "AR Optional" apps must declare minSdkVersion >= 14.
+        // "AR Required" apps must declare minSdkVersion >= 24.
         minSdkVersion 24
-        targetSdkVersion 27
+        targetSdkVersion 35
         versionCode 1
-        versionName "1.0"
+        versionName '1.0'
 
         externalNativeBuild {
             cmake {
                 cppFlags "-std=c++11", "-Wall"
                 arguments "-DANDROID_STL=c++_static",
                         "-DARCORE_LIBPATH=${arcore_libpath}/jni",
-                        "-DARCORE_INCLUDE=${project.rootDir}/../../libraries/include"
+                        "-DARCORE_INCLUDE=${project.rootDir}/../../libraries/include",
+                        "-DGLM_INCLUDE=${project.rootDir}/../../third_party/glm"
             }
         }
         ndk {
-            abiFilters "arm64-v8a", "x86"
+            abiFilters "arm64-v8a", "armeabi-v7a", "x86"
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
     }
     buildTypes {
         release {
@@ -50,12 +68,12 @@ android {
 }
 
 dependencies {
-    // ARCore library
-    implementation 'com.google.ar:core:1.5.0'
-    natives 'com.google.ar:core:1.5.0'
+    // ARCore (Google Play Services for AR) library.
+    implementation 'com.google.ar:core:1.47.0'
+    natives 'com.google.ar:core:1.47.0'
 
-    implementation 'com.android.support:appcompat-v7:27.1.1'
-    implementation 'com.android.support:design:27.1.1'
+    implementation 'androidx.appcompat:appcompat:1.1.0'
+    implementation 'com.google.android.material:material:1.1.0'
 
     // Glide - An image loading and caching library for Android
     // https://github.com/bumptech/glide
@@ -80,7 +98,7 @@ task extractNativeLibraries() {
 }
 
 tasks.whenTaskAdded {
-    task-> if (task.name.contains("external") && !task.name.contains("Clean")) {
+    task -> if ((task.name.contains("external") || task.name.contains("CMake")) && !task.name.contains("Clean")) {
         task.dependsOn(extractNativeLibraries)
     }
 }

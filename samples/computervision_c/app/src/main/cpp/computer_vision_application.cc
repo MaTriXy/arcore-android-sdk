@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -15,7 +15,6 @@
  */
 
 #include "computer_vision_application.h"
-#include <media/NdkImage.h>
 #include <array>
 #include <cmath>
 #include <iomanip>
@@ -73,8 +72,8 @@ void ComputerVisionApplication::OnPause() {
   }
 }
 
-void ComputerVisionApplication::OnResume(void* env, void* context,
-                                         void* activity) {
+void ComputerVisionApplication::OnResume(JNIEnv* env, jobject context,
+                                         jobject activity) {
   LOGI("OnResume()");
 
   if (ar_session_ == nullptr) {
@@ -88,8 +87,10 @@ void ComputerVisionApplication::OnResume(void* env, void* context,
     // This method can and will fail in user-facing situations.  Your
     // application must handle these cases at least somewhat gracefully.  See
     // ComputerVision Java sample code for reasonable behavior.
-    CHECK(ArCoreApk_requestInstall(env, activity, user_requested_install,
-                                   &install_status) == AR_SUCCESS);
+    CHECKANDTHROW(
+        ArCoreApk_requestInstall(env, activity, user_requested_install,
+                                 &install_status) == AR_SUCCESS,
+        env, "Please install Google Play Services for AR (ARCore).");
 
     switch (install_status) {
       case AR_INSTALL_STATUS_INSTALLED:
@@ -103,7 +104,8 @@ void ComputerVisionApplication::OnResume(void* env, void* context,
     // This method can and will fail in user-facing situations.  Your
     // application must handle these cases at least somewhat gracefully.  See
     // ComputerVision Java sample code for reasonable behavior.
-    CHECK(ArSession_create(env, context, &ar_session_) == AR_SUCCESS);
+    CHECKANDTHROW(ArSession_create(env, context, &ar_session_) == AR_SUCCESS,
+                  env, "Failed to create AR session.");
     CHECK(ar_session_);
 
     ArConfig_create(ar_session_, &ar_config_);
@@ -122,7 +124,7 @@ void ComputerVisionApplication::OnResume(void* env, void* context,
   }
 
   const ArStatus status = ArSession_resume(ar_session_);
-  CHECK(status == AR_SUCCESS);
+  CHECKANDTHROW(status == AR_SUCCESS, env, "Failed to resume AR session.");
 }
 
 void ComputerVisionApplication::OnSurfaceCreated() {
@@ -166,21 +168,17 @@ void ComputerVisionApplication::OnDrawFrame(float split_position) {
   // released before session.resume() is called.
   std::lock_guard<std::mutex> lock(frame_image_in_use_mutex_);
 
-  ArImage* ar_image = nullptr;
-  const AImage* ndk_image = nullptr;
-  ArStatus status =
-      ArFrame_acquireCameraImage(ar_session_, ar_frame_, &ar_image);
-  if (status == AR_SUCCESS) {
-    ArImage_getNdkImage(ar_image, &ndk_image);
-  } else {
+  ArImage* image = nullptr;
+  ArStatus status = ArFrame_acquireCameraImage(ar_session_, ar_frame_, &image);
+  if (status != AR_SUCCESS) {
     LOGW(
         "ComputerVisionApplication::OnDrawFrame acquire camera image not "
         "ready.");
   }
 
-  cpu_image_renderer_.Draw(ar_session_, ar_frame_, ndk_image, aspect_ratio_,
+  cpu_image_renderer_.Draw(ar_session_, ar_frame_, image, aspect_ratio_,
                            camera_to_display_rotation_, split_position);
-  ArImage_release(ar_image);
+  ArImage_release(image);
 }
 
 std::string ComputerVisionApplication::getCameraConfigLabel(
@@ -254,7 +252,14 @@ void ComputerVisionApplication::obtainCameraConfigs() {
   ArCameraConfigList* all_camera_configs = nullptr;
   int32_t num_configs = 0;
   ArCameraConfigList_create(ar_session_, &all_camera_configs);
-  ArSession_getSupportedCameraConfigs(ar_session_, all_camera_configs);
+  // Create filter first to get both 30 and 60 fps.
+  ArCameraConfigFilter* camera_config_filter = nullptr;
+  ArCameraConfigFilter_create(ar_session_, &camera_config_filter);
+  ArCameraConfigFilter_setTargetFps(
+      ar_session_, camera_config_filter,
+      AR_CAMERA_CONFIG_TARGET_FPS_30 | AR_CAMERA_CONFIG_TARGET_FPS_60);
+  ArSession_getSupportedCameraConfigsWithFilter(
+      ar_session_, camera_config_filter, all_camera_configs);
   ArCameraConfigList_getSize(ar_session_, all_camera_configs, &num_configs);
 
   if (num_configs < 1) {

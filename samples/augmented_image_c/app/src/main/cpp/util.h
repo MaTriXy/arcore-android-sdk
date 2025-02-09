@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -50,6 +50,15 @@
   }
 #endif  // CHECK
 
+#ifndef CHECKANDTHROW
+#define CHECKANDTHROW(condition, env, msg, ...)                            \
+  if (!(condition)) {                                                      \
+    LOGE("*** CHECK FAILED at %s:%d: %s", __FILE__, __LINE__, #condition); \
+    util::ThrowJavaException(env, msg);                                    \
+    return ##__VA_ARGS__;                                                  \
+  }
+#endif  // CHECKANDTHROW
+
 namespace augmented_image {
 
 // Utilities for C AugmentedImage AR project.
@@ -82,6 +91,12 @@ void ReleaseJavaMethodIDs();
 //
 // @param operation, the name of the GL function call.
 void CheckGlError(const char* operation);
+
+// Throw a Java exception.
+//
+// @param env, the JNIEnv.
+// @param msg, the message of this exception.
+void ThrowJavaException(JNIEnv* env, const char* msg);
 
 // Creates a shader program ID.
 //

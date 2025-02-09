@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -28,6 +28,12 @@ void CheckGlError(const char* operation) {
   for (GLint error = glGetError(); error; error = glGetError()) {
     LOGE("after %s() glError (0x%x)\n", operation, error);
   }
+}
+
+void ThrowJavaException(JNIEnv* env, const char* msg) {
+  LOGE("Throw Java exception: %s", msg);
+  jclass c = env->FindClass("java/lang/RuntimeException");
+  env->ThrowNew(c, msg);
 }
 
 // Convenience function used in CreateProgram below.

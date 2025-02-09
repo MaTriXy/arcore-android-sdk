@@ -1,5 +1,5 @@
 /*
- * Copyright 2018 Google Inc. All Rights Reserved.
+ * Copyright 2018 Google LLC
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -93,6 +93,12 @@ static void CallJavaHideFitToScanImage(jobject activity) {
   JNIEnv* env = GetJniEnv();
   env->CallStaticVoidMethod(jni_class_id, jni_hide_fit_to_scan_method_id,
                             activity);
+}
+
+void ThrowJavaException(JNIEnv* env, const char* msg) {
+  LOGE("Throw Java exception: %s", msg);
+  jclass c = env->FindClass("java/lang/RuntimeException");
+  env->ThrowNew(c, msg);
 }
 
 // Convenience function used in CreateProgram below.
@@ -314,7 +320,7 @@ bool LoadObjFile(AAssetManager* mgr, const std::string& file_name,
       int matches = sscanf(line_header, "v %f %f %f\n", &vertex[0], &vertex[1],
                            &vertex[2]);
       if (matches != 3) {
-        LOGE("Format of 'v float float float' required for each vertice line");
+        LOGE("Format of 'v float float float' required for each vertex line");
         return false;
       }
 
